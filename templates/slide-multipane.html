@@ -1,0 +1,215 @@
+<!doctype html>
+<meta charset="utf-8">
+<head>
+<title>Slideviewer</title>
+<link rel="icon" type="static/images/icon.png" href="static/images/icon.png">
+<meta name="viewport" content="user-scalable=no">
+</head>
+<style type="text/css">
+html {
+    overflow: hidden;
+    font-family: Tahoma, Verdana, sans-serif;
+    text-align: left;
+}
+body {
+    margin: 5px;
+}
+h1 {
+    font-size: 1.2em;
+}
+.notice {
+    font-style: italic;
+}
+div#images {
+    position: absolute;
+    text-align: left;
+    width: 20%;
+    max-height: 98%
+}
+div#images ul {
+    display: list-item;
+    list-style-position: outside;
+    list-style-type: circle;
+    font-size: smaller;
+    line-height: 2;
+    padding-left: 0;
+    text-align: left;
+    height: 80vh;
+    overflow:hidden;
+    overflow-y: scroll;
+    border: 2px rgb(64, 64, 64);
+    background: #e1e1e1;
+}
+
+div#images li {
+    display: list-item;
+    list-style-type: circle;
+    list-style-position: outside;
+    padding-left: 3px;
+    text-align: left;
+    border:1px solid black;
+    border-radius: 10px;
+    padding:5px;
+}
+.current-slide {
+    background-color: #ccf;
+}
+* {
+text-align: center;
+}
+div#view {
+    position: absolute;
+    left: 21%;
+    width: 57.5%;
+    height: 98%;
+    background-color: black;
+    border: 1px solid #000;
+    color: #ccc;
+    text-align: left;
+}
+div#view.fullpage {
+    left: 0%;
+    border: 0;
+}
+div#properties {
+    position: absolute;
+    left: 79.5%;
+    width: 20%;
+    height: 98%;
+    overflow: auto;
+    text-align: left;
+}
+div#properties-inner {
+    display: inline-block;
+    word-wrap: normal;
+    text-align: left;
+}
+div#properties dl {
+    font-size: smaller;
+    word-spacing: 10px;
+    margin: 0;
+    word-wrap: normal;
+    text-align: left;
+}
+div#properties dt {
+    font-weight: bold;
+    border-top: 1px solid #000;
+    background-color: #eee;
+    text-align: left;
+}
+div#properties dd {
+    margin-left: 0;
+    word-wrap: normal;
+    word-break: break-all;
+    white-space: normal;
+    text-align: left;
+}
+a.hover,
+a.current{
+    background-color: rgb(189, 16, 100);
+    display: block;
+    border-radius: 10px;
+    color: white; 
+}
+</style>
+
+<div id="images">
+    <h1>Selected slides</h1>
+    Total amount: {{ len_directories }}<br>
+    <div classname="images_list">
+        <ul id="scrollableUl">
+            {% for url, name, label, index in slidelist  %}
+            <a href="{{ url_for('slide', path=url) }}">   
+            <li>
+                {{ index }}: {{ label }} {{ name }}
+            </li>
+            </a>
+            {% endfor %}
+        </ul>
+    </div>  
+</div>
+<div id="view"></div>
+<div id="properties">
+    <h1>Slide properties</h1>
+    {% if slide_label %}
+        <div id="properties-inner">
+            <dl>
+            <dt>Slide-Name:</dt>
+            <dd>{{slide_name}}</dd>
+
+            <dt>Slide-Label:</dt> 
+            <dd>{{slide_label}}</dd>
+
+            <dt>Slide-path:</dt>
+            <dd><wbr>{{slide_path}}</wbr></dd>
+
+            <dt>Full text diagnosis:</dt>
+            <dd><wbr>{{slide_fulltext_diagnosis}}</wbr></dd>
+            </dl>
+        </div>
+    {% else %}
+        <span class="notice">None</span>
+    {% endif %}
+</div>
+
+<script type="text/javascript" src="static/jquery.js"></script>
+<script type="text/javascript" src="static/openseadragon.js"></script>
+<script type="text/javascript" src="static/openseadragon-scalebar.js"></script>
+<script type="text/javascript">
+
+$(function() {
+    var dzi_data = {{ dzi_data|default('{}')|safe }};
+    var viewer = new OpenSeadragon({
+        id: "view",
+        prefixUrl: "static/images/",
+        timeout: 120000,
+        animationTime: 0.5,
+        blendTime: 0.1,
+        constrainDuringPan: true,
+        maxZoomPixelRatio: 2,
+        minZoomImageRatio: 1,
+        visibilityRatio: 1,
+        zoomPerScroll: 2,
+    });
+    viewer.scalebar({
+        xOffset: 10,
+        yOffset: 10,
+        barThickness: 3,
+        color: '#555555',
+        fontColor: '#333333',
+        backgroundColor: 'rgba(255, 255, 255, 0.5)',
+    });
+
+    function open_slide(url, mpp) {
+        var tile_source;
+        if (dzi_data[url]) {
+            // DZI XML provided as template argument (deepzoom_tile.py)
+            tile_source = new OpenSeadragon.DziTileSource(
+                    OpenSeadragon.DziTileSource.prototype.configure(
+                    OpenSeadragon.parseXml(dzi_data[url]), url));
+        } else {
+            // DZI XML fetched from server (deepzoom_server.py)
+            tile_source = url;
+        }
+        viewer.open(tile_source);
+        viewer.scalebar({
+            pixelsPerMeter: mpp ? (1e6 / mpp) : 0,
+        });
+    }
+
+    open_slide("{{ slide_url }}", parseFloat('{{ slide_mpp }}'));
+    $(".load-slide").on("click", function(ev) {
+        $(".current-slide").removeClass("current-slide");
+        $(this).parent().addClass("current-slide");
+        open_slide($(this).attr('data-url'),
+                parseFloat($(this).attr('data-mpp')));
+        ev.preventDefault();
+    });
+});
+</script>
+<script>
+    $("a[href*='" + location.pathname + "']").addClass("current"); // Highlight current Slide
+</script>
+<script>
+    $('#scrollableUl').scrollTop($('#scrollableUl a.current').position().top - $(document).height()*0.14);
+</script>
